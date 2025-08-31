@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ระบบจัดการเวรนักเรียน (Firebase) — ฉบับภาษาไทย + โรงเรียน/ห้อง/เลขที่</title>
+  <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600;700&family=Sarabun:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <style>
+    *{box-sizing:border-box}
+    :root{ --pri1:#4f46e5; --pri2:#7c3aed; --ok:#2e7d32; --err:#b71c1c; --muted:#6b7280 }
+    body{margin:0;font-family:'Kanit','Sarabun',system-ui,Segoe UI,Roboto,sans-serif;background:linear-gradient(135deg,#4f46e5,#7c3aed);min-height:100svh;color:#0f172a}
+    .container{max-width:1200px;margin:0 auto;padding:20px}
+    .header{color:#fff;text-align:center;margin-bottom:20px}
+    .header h1{margin:0 0 6px;font-size:clamp(1.6rem,2.5vw,2.3rem);text-shadow:2px 2px 12px rgba(0,0,0,.25)}
+    .card{background:rgba(255,255,255,.96);backdrop-filter:blur(8px);border-radius:18px;box-shadow:0 10px 28px rgba(0,0,0,.25);padding:22px}
+    .grid{display:grid;gap:18px}
+    .tabs{display:flex;gap:6px;background:#fff;border-radius:14px;padding:6px}
+    .tab{flex:1;border:0;background:transparent;padding:12px 14px;border-radius:10px;font-weight:700;cursor:pointer}
+    .tab.active{background:linear-gradient(135deg,var(--pri1),var(--pri2));color:#fff}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    label{font-weight:700;margin-bottom:6px;display:block}
+    input,select{width:100%;padding:12px;border:2px solid #e6e6ef;border-radius:12px;font-size:15px}
+    input:focus,select:focus{outline:none;border-color:var(--pri1);box-shadow:0 0 0 4px rgba(79,70,229,.15)}
+    button{border:0;background:linear-gradient(135deg,var(--pri1),var(--pri2));color:#fff;font-weight:800;padding:12px 18px;border-radius:12px;cursor:pointer}
+    button[disabled]{opacity:.6;cursor:not-allowed}
+    .pill{display:inline-flex;align-items:center;padding:6px 10px;border-radius:999px;font-size:12px;font-weight:800}
+    .pill.pending{background:#ffe08a;color:#7a5200}
+    .pill.submitted{background:#d6ecff;color:#0a4a8b}
+    .pill.approved{background:#c8f7cf;color:#0a6b2b}
+    .pill.rejected{background:#ffd6db;color:#7b1524}
+    .status-legend{display:flex;gap:8px;flex-wrap:wrap}
+    .day-card{background:linear-gradient(135deg,#f093fb,#f5576c);color:#fff;border-radius:16px;padding:16px;box-shadow:0 6px 18px rgba(0,0,0,.2)}
+    .muted{color:var(--muted)}
+    .list{background:rgba(255,255,255,.2);border-radius:12px;padding:8px 10px}
+    .item{display:flex;align-items:center;justify-content:space-between;padding:8px 2px;border-bottom:1px solid rgba(255,255,255,.3)}
+    .item:last-child{border-bottom:0}
+    .upload{border:2px dashed var(--pri1);border-radius:14px;padding:30px;text-align:center;cursor:pointer}
+    .upload:hover{background:rgba(79,70,229,.08)}
+    .preview{max-width:100%;max-height:280px;border-radius:10px;display:none;margin-top:10px}
+    .review-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+    .review-card{background:#fff;border-radius:14px;padding:14px;box-shadow:0 4px 14px rgba(0,0,0,.12)}
+    .review-actions{display:flex;gap:8px;margin-top:10px}
+    .btn-green{background:linear-gradient(135deg,#4caf50,#2e7d32)}
+    .btn-red{background:linear-gradient(135deg,#f44336,#b71c1c)}
+    .topbar{display:flex;gap:10px;align-items:center;justify-content:space-between}
+    .topbar small{color:#fff;opacity:.9}
+    @media (max-width: 920px){.row{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🏫 ระบบจัดการเวรนักเรียน</h1>
+      <p>ฉบับภาษาไทย พร้อมฟิลด์ โรงเรียน / ห้อง / เลขที่ — เชื่อม Firebase จริง</p>
+    </div>
+
+    <!-- Auth -->
+    <div id="auth" class="card">
+      <div class="grid">
+        <h2 style="margin:0">เข้าสู่ระบบ / สมัครสมาชิก</h2>
+        <div class="row">
+          <div>
+            <label>อีเมล</label>
+            <input id="email" type="email" placeholder="you@example.com" />
+          </div>
+          <div>
+            <label>รหัสผ่าน</label>
+            <input id="password" type="password" placeholder="อย่างน้อย 6 ตัวอักษร" />
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label>ชื่อ-นามสกุล (สมัครสมาชิก)</label>
+            <input id="fullName" type="text" placeholder="เช่น ด.ช. สมชาย ใจดี" />
+          </div>
+          <div>
+            <label>ประเภทผู้ใช้</label>
+            <select id="role">
+              <option value="student">นักเรียน</option>
+              <option value="teacher">ครู/หัวหน้าห้อง</option>
+            </select>
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label>โรงเรียน</label>
+            <input id="school" type="text" placeholder="เช่น โรงเรียนบ้านนาสาร" />
+          </div>
+          <div>
+            <label>ชั้น/ห้อง</label>
+            <input id="classroom" type="text" placeholder="เช่น ม.2/3" />
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label>เลขที่ (ในห้อง)</label>
+            <input id="studentNo" type="number" min="1" placeholder="เช่น 15" />
+          </div>
+          <div style="display:flex;gap:10px;align-items:flex-end">
+            <button id="btnSignIn" style="width:100%">เข้าสู่ระบบ</button>
+            <button id="btnSignUp" class="btn-green" style="width:100%">สมัครสมาชิกใหม่</button>
+          </div>
+        </div>
+        <div class="status-legend">
+          <div class="pill pending">รอส่ง</div>
+          <div class="pill submitted">ส่งแล้วรอตรวจ</div>
+          <div class="pill approved">ผ่าน</div>
+          <div class="pill rejected">ไม่ผ่าน</div>
+        </div>
+        <small id="authMsg"></small>
+      </div>
+    </div>
+
+    <!-- App -->
+    <div id="app" class="grid" style="display:none;margin-top:16px">
+      <div class="topbar">
+        <div style="color:#fff">
+          <div id="welcome" style="font-weight:800"></div>
+          <small id="roleText"></small>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button id="btnSignOut">ออกจากระบบ</button>
+        </div>
+      </div>
+
+      <!-- Student UI -->
+      <div id="studentUI" class="card" style="display:none">
+        <div class="tabs" role="tablist">
+          <button class="tab active" data-tab="myDuties">เวรของฉัน</button>
+          <button class="tab" data-tab="submitWork">ส่งผลงาน</button>
+        </div>
+        <div id="myDuties" class="grid">
+          <h3>📅 ตารางเวรของฉัน</h3>
+          <div id="studentDutyList" class="grid" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr))"></div>
+        </div>
+        <div id="submitWork" class="grid" style="display:none">
+          <h3>📤 ส่งผลงาน</h3>
+          <div>
+            <label>เลือกวันเวร</label>
+            <select id="dutyDaySelect"></select>
+          </div>
+          <label>อัปโหลดภาพหลังทำความสะอาด</label>
+          <div class="upload" id="uploadBox">
+            <input id="photoInput" type="file" accept="image/*" style="display:none" />
+            <div>📷 คลิกเพื่อเลือก/ถ่ายภาพ</div>
+            <img id="preview" class="preview" />
+          </div>
+          <div>
+            <button id="btnSubmitWork" disabled>ส่งผลงาน</button>
+            <small id="submitMsg"></small>
+          </div>
+        </div>
+      </div>
+
+      <!-- Teacher UI -->
+      <div id="teacherUI" class="card" style="display:none">
+        <div class="tabs" role="tablist">
+          <button class="tab active" data-tab="manage">จัดการเวร</button>
+          <button class="tab" data-tab="review">ตรวจงาน</button>
+          <button class="tab" data-tab="reports">รายงาน</button>
+        </div>
+        <div id="manage" class="grid">
+          <h3>📋 มอบหมายเวรประจำ</h3>
+          <div class="row">
+            <div>
+              <label>เลือกนักเรียน</label>
+              <select id="studentSelect"></select>
+            </div>
+            <div>
+              <label>เลือกวัน</label>
+              <select id="daySelect">
+                <option value="monday">ทุกวันจันทร์</option>
+                <option value="tuesday">ทุกวันอังคาร</option>
+                <option value="wednesday">ทุกวันพุธ</option>
+                <option value="thursday">ทุกวันพฤหัสบดี</option>
+                <option value="friday">ทุกวันศุกร์</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <button id="btnAssign">📌 กำหนดเวรประจำ</button>
+            <small id="assignMsg"></small>
+          </div>
+          <h3 style="margin-top:16px">🗓️ ตารางเวรประจำ</h3>
+          <div id="schedule" class="grid" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr))"></div>
+          <h3 style="margin-top:16px">📊 สรุปเวรทั้งหมด</h3>
+          <div id="summary" class="grid"></div>
+        </div>
+
+        <div id="review" class="grid" style="display:none">
+          <h3>✅ ตรวจสอบผลงานที่รออนุมัติ</h3>
+          <div id="reviewList" class="review-grid"></div>
+        </div>
+
+        <div id="reports" class="grid" style="display:none">
+          <h3>📈 สถิติ</h3>
+          <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">
+            <div class="day-card"><div>รอตรวจ</div><div id="statPending" style="font-size:38px;font-weight:800">0</div></div>
+            <div class="day-card"><div>ผ่าน</div><div id="statApproved" style="font-size:38px;font-weight:800">0</div></div>
+            <div class="day-card"><div>ไม่ผ่าน</div><div id="statRejected" style="font-size:38px;font-weight:800">0</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase + App Logic -->
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js';
+    import { getAnalytics } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-analytics.js';
+    import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, updateProfile } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js';
+    import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, addDoc, getDocs, onSnapshot, query, where, arrayUnion, arrayRemove, writeBatch, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js';
+    import { getStorage, ref as sRef, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-storage.js';
+
+    const firebaseConfig = {
+      apiKey: 'AIzaSyB0RRS4QLaYhsiW_uImTzOJUpcAWmMHr2A',
+      authDomain: 'bss-8950d.firebaseapp.com',
+      projectId: 'bss-8950d',
+      storageBucket: 'bss-8950d.firebasestorage.app',
+      messagingSenderId: '343733507437',
+      appId: '1:343733507437:web:8d1c6e4315f25e8fdab664',
+      measurementId: 'G-X611D447KQ'
+    };
+
+    const app = initializeApp(firebaseConfig);
+    try { getAnalytics(app); } catch(e) {}
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const storage = getStorage(app);
+
+    const dayNames = { monday:'วันจันทร์', tuesday:'วันอังคาร', wednesday:'วันพุธ', thursday:'วันพฤหัสบดี', friday:'วันศุกร์' };
+    const $ = sel => document.querySelector(sel);
+    const toast = (el, msg, ok=true) => { el.textContent = msg; el.style.color = ok ? '#2e7d32' : '#b71c1c'; setTimeout(()=> el.textContent='', 3500); };
+    const pill = (status) => `<span class="pill ${status}">` + (status==='pending'?'รอส่ง': status==='submitted'?'ส่งแล้วรอตรวจ': status==='approved'?'ผ่าน':'ไม่ผ่าน') + '</span>';
+
+    // ===== Auth Inputs =====
+    const emailEl = $('#email');
+    const passwordEl = $('#password');
+    const fullNameEl = $('#fullName');
+    const roleEl = $('#role');
+    const schoolEl = $('#school');
+    const classEl = $('#classroom');
+    const noEl = $('#studentNo');
+    const authMsg = $('#authMsg');
+
+    $('#btnSignUp').addEventListener('click', async () => {
+      const email = emailEl.value.trim();
+      const pass = passwordEl.value;
+      const fullName = fullNameEl.value.trim();
+      const role = roleEl.value;
+      const school = schoolEl.value.trim();
+      const classroom = classEl.value.trim();
+      const studentNo = noEl.value ? Number(noEl.value) : null;
+      if(!email || !pass || !fullName){ return toast(authMsg,'กรอกข้อมูลให้ครบ',false) }
+      try{
+        const cred = await createUserWithEmailAndPassword(auth,email,pass);
+        await updateProfile(cred.user,{ displayName: fullName });
+        await setDoc(doc(db,'users',cred.user.uid),{ fullName, role, email, school, classroom, studentNo, createdAt: serverTimestamp() });
+        toast(authMsg,'สมัครสมาชิกสำเร็จ ✔');
+      }catch(e){ toast(authMsg,e.message,false) }
+    });
+
+    $('#btnSignIn').addEventListener('click', async () => {
+      const email = emailEl.value.trim();
+      const pass = passwordEl.value;
+      if(!email || !pass){ return toast(authMsg,'กรอกอีเมลและรหัสผ่าน',false) }
+      try{ await signInWithEmailAndPassword(auth,email,pass); }
+      catch(e){ toast(authMsg,'เข้าสู่ระบบไม่สำเร็จ: '+e.message,false) }
+    });
+
+    $('#btnSignOut').addEventListener('click', () => signOut(auth));
+
+    // Tabs
+    function bindTabs(scope){
+      scope.querySelectorAll('.tab').forEach(btn=>{
+        btn.addEventListener('click',()=>{
+          const target = btn.dataset.tab;
+          scope.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+          btn.classList.add('active');
+          scope.querySelectorAll('[id]').forEach(sec=>{
+            if(['myDuties','submitWork','manage','review','reports'].includes(sec.id)){
+              sec.style.display = sec.id===target ? '' : 'none';
+            }
+          })
+        })
+      })
+    }
+    bindTabs($('#studentUI'));
+    bindTabs($('#teacherUI'));
+
+    // Data model
+    // users/{uid} -> { fullName, role, email, school, classroom, studentNo }
+    // schedules/regular -> { monday: [uid], ... }
+    // submissions/{autoId} -> { studentUid, studentName, school, classroom, studentNo, day, photoURL, status, submittedAt }
+
+    async function ensureScheduleDoc(){
+      const ref = doc(db,'schedules','regular');
+      const snap = await getDoc(ref);
+      if(!snap.exists()){
+        await setDoc(ref,{ monday:[], tuesday:[], wednesday:[], thursday:[], friday:[] });
+      }
+      return ref;
+    }
+
+    // ===== Student UI =====
+    const dutyDaySelect = $('#dutyDaySelect');
+    const previewImg = $('#preview');
+    const photoInput = $('#photoInput');
+    const uploadBox = $('#uploadBox');
+    const submitMsg = $('#submitMsg');
+
+    uploadBox.addEventListener('click',()=> photoInput.click());
+    photoInput.addEventListener('change',()=>{
+      const f = photoInput.files?.[0];
+      if(f){
+        const reader = new FileReader();
+        reader.onload = e=>{ previewImg.src = e.target.result; previewImg.style.display='block'; $('#btnSubmitWork').disabled = !dutyDaySelect.value }
+        reader.readAsDataURL(f);
+      }
+    });
+
+    dutyDaySelect.addEventListener('change',()=>{ $('#btnSubmitWork').disabled = !(dutyDaySelect.value && photoInput.files?.length) });
+
+    $('#btnSubmitWork').addEventListener('click', async ()=>{
+      const user = auth.currentUser; if(!user) return;
+      const day = dutyDaySelect.value; const file = photoInput.files?.[0];
+      if(!day || !file) return;
+      try{
+        const u = (await getDoc(doc(db,'users',user.uid))).data()||{};
+        const path = `submissions/${user.uid}/${Date.now()}_${file.name}`;
+        const ref = sRef(storage,path);
+        await uploadBytes(ref,file);
+        const url = await getDownloadURL(ref);
+        await addDoc(collection(db,'submissions'),{
+          studentUid: user.uid,
+          studentName: u.fullName || user.displayName || 'ไม่ระบุ',
+          school: u.school || '', classroom: u.classroom || '', studentNo: u.studentNo || null,
+          day, photoURL: url, status: 'submitted', submittedAt: serverTimestamp()
+        });
+        dutyDaySelect.value=''; photoInput.value=''; previewImg.style.display='none';
+        toast(submitMsg,'ส่งผลงานแล้ว (สถานะ: ส่งแล้วรอตรวจ) ✔');
+      }catch(e){ toast(submitMsg,'ส่งงานไม่สำเร็จ: '+e.message,false) }
+    });
+
+    async function loadStudentDuties(uid){
+      const ref = await ensureScheduleDoc();
+      const sched = (await getDoc(ref)).data();
+      const myDays = Object.keys(dayNames).filter(d=> (sched[d]||[]).includes(uid));
+      const container = $('#studentDutyList');
+      container.innerHTML='';
+      if(myDays.length===0){ container.innerHTML = '<div class="muted">ยังไม่มีเวรที่ได้รับมอบหมาย</div>'; }
+      const u = (await getDoc(doc(db,'users',uid))).data()||{};
+      for(const d of myDays){
+        const qSnap = await getDocs(query(collection(db,'submissions'), where('studentUid','==',uid), where('day','==',d)));
+        let status = 'pending';
+        qSnap.forEach(s=>{ status = s.data().status });
+        const card = document.createElement('div');
+        card.className='day-card';
+        card.innerHTML = `<h3>${dayNames[d]}</h3>
+          <div class="list">
+            <div class="item"><div>
+              <div style="font-weight:800">${u.fullName || 'ไม่ระบุ'}</div>
+              <div style="font-size:12px;opacity:.95">โรงเรียน: ${u.school||'-'} | ห้อง: ${u.classroom||'-'} | เลขที่: ${u.studentNo||'-'}</div>
+            </div><div>${pill(status)}</div></div>
+          </div>`;
+        container.appendChild(card);
+      }
+      dutyDaySelect.innerHTML = '<option value="">-- เลือกวันเวร --</option>';
+      myDays.forEach(d=>{
+        const opt = document.createElement('option'); opt.value=d; opt.textContent=dayNames[d]; dutyDaySelect.appendChild(opt);
+      })
+    }
+
+    // ===== Teacher UI =====
+    const studentSelect = $('#studentSelect');
+    const daySelect = $('#daySelect');
+    const assignMsg = $('#assignMsg');
+
+    $('#btnAssign').addEventListener('click', async ()=>{
+      const uid = studentSelect.value; const day = daySelect.value; if(!uid) return toast(assignMsg,'เลือกนักเรียนก่อน',false);
+      try{
+        const ref = await ensureScheduleDoc();
+        await updateDoc(ref,{ [day]: arrayUnion(uid) });
+        toast(assignMsg,'กำหนดเวรสำเร็จ ✔');
+        await renderSchedule();
+        await renderSummary();
+      }catch(e){ toast(assignMsg,'ไม่สำเร็จ: '+e.message,false)}
+    });
+
+    async function removeDuty(day, uid){
+      await updateDoc(await ensureScheduleDoc(),{ [day]: arrayRemove(uid) });
+      await renderSchedule(); await renderSummary();
+    }
+
+    function decorateStudentLabel(d){
+      const base = d.fullName || 'ไม่ระบุ';
+      const tail = [d.classroom?`ห้อง ${d.classroom}`:null, d.studentNo?`เลขที่ ${d.studentNo}`:null].filter(Boolean).join(' • ');
+      return tail? `${base} — ${tail}` : base;
+    }
+
+    async function listStudents(){
+      const snap = await getDocs(query(collection(db,'users'), where('role','==','student')));
+      studentSelect.innerHTML = '<option value="">-- เลือกนักเรียน --</option>';
+      const items = [];
+      snap.forEach(d=>{ const data=d.data(); items.push({uid:d.id, ...data}) });
+      items.sort((a,b)=> (a.classroom||'').localeCompare(b.classroom||'', 'th') || (a.studentNo||0)-(b.studentNo||0));
+      items.forEach(s=>{ const op=document.createElement('option'); op.value=s.uid; op.textContent=decorateStudentLabel(s); studentSelect.appendChild(op) });
+      return Object.fromEntries(items.map(s=>[s.uid,s]));
+    }
+
+    async function renderSchedule(){
+      const container = $('#schedule'); container.innerHTML='';
+      const sched = (await getDoc(await ensureScheduleDoc())).data();
+      const studentMap = await listStudents();
+      for(const d of Object.keys(dayNames)){
+        const card = document.createElement('div'); card.className='day-card';
+        const arr = sched[d]||[];
+        const inner = arr.length? arr.map(uid=>{
+          const sv = studentMap[uid];
+          const n = sv?.fullName || uid;
+          const line2 = `โรงเรียน: ${sv?.school||'-'} | ห้อง: ${sv?.classroom||'-'} | เลขที่: ${sv?.studentNo||'-'}`;
+          return `<div class="item"><div><strong>${n}</strong><div style="font-size:12px;opacity:.95">${line2}</div><div class=\"muted\" style=\"font-size:12px\">เวรประจำทุก${dayNames[d]}</div></div><div><button class="btn-red" data-remove="${d}|${uid}" style="padding:6px 10px">ลบ</button></div></div>`
+        }).join('') : `<div class="muted" style="padding:6px 0">ยังไม่มีนักเรียนในเวรนี้</div>`;
+        card.innerHTML = `<h3 style="margin:0 0 8px">${dayNames[d]} <span class="muted" style="font-size:12px">(${arr.length} คน)</span></h3><div class="list">${inner}</div>`;
+        container.appendChild(card);
+      }
+      container.querySelectorAll('button[data-remove]').forEach(btn=>{
+        btn.addEventListener('click', async ()=>{
+          const [d,uid] = btn.dataset.remove.split('|');
+          if(confirm('ยืนยันลบเวรนี้?')) await removeDuty(d,uid);
+        })
+      })
+    }
+
+    async function renderSummary(){
+      const container = $('#summary'); container.innerHTML='';
+      const sched = (await getDoc(await ensureScheduleDoc())).data();
+      const studentMap = await listStudents();
+      const map = {};
+      for(const d of Object.keys(dayNames)){
+        (sched[d]||[]).forEach(uid=>{ map[uid] = map[uid] || []; map[uid].push(dayNames[d]); })
+      }
+      const entries = Object.entries(map).sort((a,b)=>{
+        const A = studentMap[a[0]]||{}; const B = studentMap[b[0]]||{};
+        return (A.classroom||'').localeCompare(B.classroom||'','th') || (A.studentNo||0)-(B.studentNo||0);
+      });
+      if(entries.length===0){ container.innerHTML='<div class="muted">ยังไม่มีการกำหนดเวร</div>'; return }
+      entries.forEach(([uid,days])=>{
+        const s = studentMap[uid]||{};
+        const div = document.createElement('div'); div.className='card';
+        div.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+          <div>
+            <strong>${s.fullName||uid}</strong>
+            <div class="muted" style="font-size:12px">โรงเรียน: ${s.school||'-'} | ห้อง: ${s.classroom||'-'} | เลขที่: ${s.studentNo||'-'}</div>
+            <div class="muted" style="font-size:12px">📅 เวรประจำ: ${days.join(', ')}</div>
+          </div>
+          <button class="btn-red" data-removeall="${uid}">ลบทั้งหมด</button>
+        </div>`;
+        container.appendChild(div);
+      })
+      container.querySelectorAll('[data-removeall]').forEach(btn=>{
+        btn.addEventListener('click', async ()=>{
+          const uid = btn.dataset.removeall;
+          if(!confirm('ลบเวรทั้งหมดของนักเรียนคนนี้?')) return;
+          const ref = await ensureScheduleDoc();
+          const snap = await getDoc(ref); const data = snap.data();
+          const batch = writeBatch(db);
+          for(const d of Object.keys(dayNames)){
+            if((data[d]||[]).includes(uid)){
+              const arr = (data[d]||[]).filter(x=>x!==uid); batch.update(ref,{ [d]: arr });
+            }
+          }
+          await batch.commit(); await renderSchedule(); await renderSummary();
+        })
+      })
+    }
+
+    function attachReviewRealtime(){
+      return onSnapshot(query(collection(db,'submissions'), where('status','==','submitted')),(snap)=>{
+        const list = $('#reviewList'); list.innerHTML='';
+        if(snap.empty){ list.innerHTML='<div class="muted">ไม่มีงานที่รอตรวจ</div>'; }
+        snap.forEach(docu=>{
+          const d = docu.data();
+          const id = docu.id;
+          const card = document.createElement('div'); card.className='review-card';
+          const meta = [d.school?`โรงเรียน ${d.school}`:null, d.classroom?`ห้อง ${d.classroom}`:null, d.studentNo?`เลขที่ ${d.studentNo}`:null].filter(Boolean).join(' • ');
+          card.innerHTML = `<h4 style="margin:0 0 6px">${d.studentName}</h4>
+            <div class="muted" style="font-size:13px">${meta || ''}</div>
+            <div class="muted" style="font-size:13px">วัน: ${dayNames[d.day]||d.day}</div>
+            <img src="${d.photoURL}" style="width:100%;max-height:220px;object-fit:cover;border-radius:10px;margin:10px 0" />
+            <div class="review-actions">
+              <button class="btn-green" data-approve="${id}">อนุมัติ (ผ่าน)</button>
+              <button class="btn-red" data-reject="${id}">ไม่ผ่าน</button>
+            </div>`;
+          list.appendChild(card);
+        });
+        list.querySelectorAll('[data-approve]').forEach(b=> b.addEventListener('click',()=> updateDoc(doc(db,'submissions',b.dataset.approve),{status:'approved'})) );
+        list.querySelectorAll('[data-reject]').forEach(b=> b.addEventListener('click',()=>{
+          const reason = prompt('เหตุผลที่ไม่ผ่าน:');
+          if(reason!=null){ updateDoc(doc(db,'submissions',b.dataset.reject),{status:'rejected', rejectReason: reason}) }
+        }));
+      })
+    }
+
+    async function renderStats(){
+      const p = await getDocs(query(collection(db,'submissions'), where('status','==','submitted')));
+      const a = await getDocs(query(collection(db,'submissions'), where('status','==','approved')));
+      const r = await getDocs(query(collection(db,'submissions'), where('status','==','rejected')));
+      $('#statPending').textContent = p.size; $('#statApproved').textContent = a.size; $('#statRejected').textContent = r.size;
+    }
+
+    let unsubReview = null;
+    onAuthStateChanged(auth, async (user)=>{
+      if(!user){ $('#app').style.display='none'; $('#auth').style.display='block'; return; }
+      const userDoc = await getDoc(doc(db,'users',user.uid));
+      const u = userDoc.exists()? userDoc.data() : { fullName: user.displayName || user.email, role:'student' };
+      $('#auth').style.display='none'; $('#app').style.display='grid';
+      $('#welcome').textContent = `ยินดีต้อนรับ ${u.fullName}${u.classroom?` (ห้อง ${u.classroom}${u.studentNo?` เลขที่ ${u.studentNo}`:''})`:''}`;
+      $('#roleText').textContent = `บทบาท: ${u.role==='teacher'?'ครู/หัวหน้าห้อง':'นักเรียน'}${u.school?` • โรงเรียน: ${u.school}`:''}`;
+
+      if(u.role==='student'){
+        $('#studentUI').style.display='block'; $('#teacherUI').style.display='none';
+        await loadStudentDuties(user.uid);
+      } else {
+        $('#studentUI').style.display='none'; $('#teacherUI').style.display='block';
+        await listStudents(); await renderSchedule(); await renderSummary();
+        if(unsubReview) unsubReview(); unsubReview = attachReviewRealtime();
+        await renderStats();
+      }
+    });
+  </script>
+
+  <!-- Firestore Rules (คัดลอกไปวางใน Console > Firestore Rules)
+  rules_version = '2';
+  service cloud.firestore {
+    match /databases/{database}/documents {
+      function isSignedIn() { return request.auth != null; }
+      function isTeacher(uid) { return get(/databases/$(database)/documents/users/$(uid)).data.role == 'teacher'; }
+
+      match /users/{uid} {
+        allow read: if isSignedIn();
+        allow write: if request.auth.uid == uid || isTeacher(request.auth.uid);
+      }
+
+      match /schedules/{docId} {
+        allow read: if isSignedIn();
+        allow write: if isTeacher(request.auth.uid);
+      }
+
+      match /submissions/{id} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn() && request.resource.data.studentUid == request.auth.uid;
+        allow update, delete: if isTeacher(request.auth.uid);
+      }
+    }
+  }
+  -->
+
+  <!-- Storage Rules (Console > Storage > Rules)
+  rules_version = '2';
+  service firebase.storage {
+    match /b/{bucket}/o {
+      function isSignedIn() { return request.auth != null; }
+      match /submissions/{userId}/{allPaths=**} {
+        allow read: if isSignedIn();
+        allow write: if isSignedIn() && request.auth.uid == userId;
+      }
+    }
+  }
+  -->
+</body>
+</html>
